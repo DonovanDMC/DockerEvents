@@ -10,11 +10,43 @@ try {
     throw new Error(`Hosts file "${hostsFile}" is either missing, or not readable/writable.`, { cause: err });
 }
 
+class Queue {
+    static queue = [];
+    static running = false;
+
+    static add(fn, priority = false) {
+        if(priority === true) {
+            this.queue.unshift(fn);
+        } else {
+            this.queue.push(fn);
+        }
+
+        if(this.running === false) {
+            this.running = true;
+            this.next();
+        }
+    }
+
+    static async next() {
+        const fn = this.queue.shift();
+        if(fn === undefined) {
+            this.running = false;
+            return;
+        }
+        try {
+            await fn();
+        } catch(err) {
+            console.error("Queue Error:", err);
+        }
+        
+        this.next();
+    }
+}
+
 const events = new DockerEvents({ socketPath: "/var/run/docker.sock" });
 process
-.once("SIGINT", cleam.bind(null, "SIGINT"))
-.once("SIGTERM", clean.bind(null, "SIGTERM"))
-.once("SIGKILL", clean.bind(null, "SIGKILL"))
+    .once("SIGINT", clean.bind(null, "SIGINT"))
+    .once("SIGTERM", clean.bind(null, "SIGTERM"));
 function clean(signal) {
      events.close();
     process.kill(process.pid, signal);
@@ -23,24 +55,34 @@ function clean(signal) {
 console.log("Launching - refreshing");
 await refresh();
 
-events.on("container.start", async(data) => {
-    if(data.Actor.Attributes.hostname !== undefined) {
-        console.log("Got start for %s - refreshing", data.Actor.Attributes.hostname);
-        await refresh();
-    }
-});
-events.on("container.stop", async(data) => {
-    if(data.Actor.Attributes.hostname !== undefined) {
-        console.log("Got stop for %s - refreshing", data.Actor.Attributes.hostname);
-        await refresh();
-    }
-});
-events.on("container.die", async(data) => {
-    if(data.Actor.Attributes.hostname !== undefined) {
-        console.log("Got die for %s - refreshing", data.Actor.Attributes.hostname);
-        await refresh();
-    }
-});
+events
+    .on("container.start", async(data) => {
+        if(data.Actor.Attributes.hostname !== undefined) {
+            Queue.add((async() => {
+                console.log("Got start for %s - refreshing", data.Actor.Attributes.hostname);
+                await refresh();
+            }));
+        }
+    })
+    .on("container.stop", async(data) => {
+        if(data.Actor.Attributes.hostname !== undefined) {
+            Queue.add((async() => {
+                console.log("Got stop for %s - refreshing", data.Actor.Attributes.hostname);
+                await refresh();
+            }));
+        }
+    })
+    .on("container.die", async(data) => {
+        if(data.Actor.Attributes.hostname !== undefined) {
+            Queue.add((async() => {
+                console.log("Got die for %s - refreshing", data.Actor.Attributes.hostname);
+                await refresh();
+            }));
+        }
+    })
+    .on("error", (err) => {
+        console.error("Events Error:", err);
+    })
 
 async function refresh() {
     const content = (await readFile(hostsFile, { encoding: "utf-8" })).split("\n");
