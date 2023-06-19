@@ -8,7 +8,7 @@ try {
     debug = (await import("debug")).default("docker-events");
 } catch {}
 
-export default function connect(info: string | URL, cb: (...args: [err: Error, data: null] | [err: null, data: AnyEventParams[0] | null]) => void) {
+export function connect(info: string | URL, cb: (...args: [err: Error, data: null] | [err: null, data: AnyEventParams[0] | null]) => void) {
     let request: typeof http.request | typeof https.request = http.request;
     const options: http.RequestOptions = {
         path:    "/events",
@@ -57,4 +57,42 @@ export default function connect(info: string | URL, cb: (...args: [err: Error, d
     });
     req.end();
     return req;
+}
+export function get<T = unknown>(info: string | URL, path: string) {
+    let request: typeof http.request | typeof https.request = http.request;
+    const options: http.RequestOptions = {
+        path,
+        headers: {
+            Accept: "application/json"
+        },
+        method: "GET"
+    };
+    if (typeof info === "string") {
+        options.socketPath = info;
+    } else {
+        options.host = info.host;
+        options.port = info.port;
+        if (info.protocol === "https:") {
+            request = https.request;
+        }
+    }
+    return new Promise<T>((resolve, reject) => {
+        const req = request(options, res => {
+            if (!res.headers["content-type"]?.startsWith("application/json")) {
+                req.end(() => {
+                    throw new Error(`Invalid content-type: ${res.headers["content-type"] ?? ""}`);
+                });
+                return;
+            }
+            const data: Array<Buffer> = [];
+            res
+                .on("error", reject)
+                .on("data", data.push.bind(data))
+                .on("end", () => {
+                    resolve(JSON.parse(Buffer.concat(data).toString()) as T);
+                });
+        });
+        req.end();
+
+    });
 }
