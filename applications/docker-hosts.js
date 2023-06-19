@@ -11,10 +11,14 @@ try {
 }
 
 const events = new DockerEvents({ socketPath: "/var/run/docker.sock" });
-process.on("SIGINT", () => {
-    events.close();
-    process.kill(process.pid, "SIGINT");
-});
+process
+.once("SIGINT", cleam.bind(null, "SIGINT"))
+.once("SIGTERM", clean.bind(null, "SIGTERM"))
+.once("SIGKILL", clean.bind(null, "SIGKILL"))
+function clean(signal) {
+     events.close();
+    process.kill(process.pid, signal);
+}
 
 console.log("Launching - refreshing");
 await refresh();
