@@ -78,7 +78,7 @@ events
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
                 log("group", "Got start for %s - refreshing", data.Actor.Attributes.hostname);
-                await refresh();
+                await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
         }
@@ -87,7 +87,7 @@ events
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
                 log("group", "Got stop for %s - refreshing", data.Actor.Attributes.hostname);
-                await refresh();
+                await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
         }
@@ -96,7 +96,7 @@ events
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
                 log("group", "Got die for %s - refreshing", data.Actor.Attributes.hostname);
-                await refresh();
+                await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
         }
@@ -115,7 +115,8 @@ function log(type, formatter, ...args) {
     console[type](`\u001B[90m%s \u001B[0m${formatter}`, new Date().toISOString(), ...args);
 }
 
-async function refresh() {
+/** @param {string} [from] */
+async function refresh(from) {
     const content = (await readFile(hostsFile, { encoding: "utf8" })).split("\n");
     const startIndex = content.findIndex(d => d.startsWith("# begin docker-hosts"));
     const endIndex = content.findIndex(d => d.startsWith("# end docker-hosts"));
@@ -160,35 +161,49 @@ async function refresh() {
     }
 
     for (const d of duplicateHosts) {
-        console.group(`[Refresh] Duplicate host ${d.host} found on ${d.containers.length} containers`);
-        const hasNumbers = d.containers.every(c => /-\d+$/.test(c.name));
         /** @type {import("./types").ContainerInfo | undefined} */
         let container;
-        if (hasNumbers) {
-            log("debug", "Containers seem to be numbered, using highest container.");
-            const highest = d.containers.reduce((prev, curr) => {
-                const num = Number(curr.name.at(-1));
-                return isNaN(num) ?  prev : Math.max(prev, num);
-            }, -1);
-            container = d.containers.find(c => c.name.endsWith(`-${highest}`));
-            if (container === undefined) {
-                log("error", "Failed to find highest numbered container, using first container.");
+
+        let shouldLog = true;
+        // not our concern currently, defer to what we already have in the hosts file.
+        if (from === undefined || d.containers.some(c => c.container === from)) {
+            console.group(`[Refresh] Duplicate host ${d.host} found on ${d.containers.length} containers`);
+
+            const hasNumbers = d.containers.every(c => /-\d+$/.test(c.name));
+            if (hasNumbers) {
+                log("debug", "Containers seem to be numbered, using highest container.");
+                const highest = d.containers.reduce((prev, curr) => {
+                    const num = Number(curr.name.at(-1));
+                    return isNaN(num) ?  prev : Math.max(prev, num);
+                }, -1);
+                container = d.containers.find(c => c.name.endsWith(`-${highest}`));
+                if (container === undefined) {
+                    log("error", "Failed to find highest numbered container, using first container.");
+                    container = d.containers[0];
+                }
+            } else {
+                log("warn", "Containers do not seem to be numbered, using first container.");
                 container = d.containers[0];
             }
-        } else {
-            log("warn", "Containers do not seem to be numbered, using first container.");
-            container = d.containers[0];
-        }
 
-        if (container === undefined) {
-            log("error", "Failed to pick container to assign host.");
+            if (container === undefined) {
+                log("error", "Failed to pick container to assign host.");
+            }
+        } else {
+            container = d.containers.find(c => content.some(l => l.includes(c.container)));
+            if (container === undefined) {
+                container = d.containers[0];
+            }
+            shouldLog = false;
         }
 
         for (const c of d.containers) {
             if (c === container) {
                 continue;
             }
-            log("debug", "Removing container %s (%s).", c.container, c.name);
+            if (shouldLog) {
+                log("debug", "Removing container %s (%s).", c.container, c.name);
+            }
             const index = containers.indexOf(container);
             containers.splice(index, 1);
         }
