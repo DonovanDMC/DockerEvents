@@ -6,7 +6,7 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "prepare": "tsc && cp -r src/types dist"
+    "prepare": "tsc -p tsconfig.build.json && cp -r src/types dist"
   },
   "repository": {
     "type": "git",
