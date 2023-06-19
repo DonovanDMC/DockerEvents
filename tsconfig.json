@@ -2,8 +2,9 @@
   "extends": "@uwu-codes/tsconfig/esm",
   "compilerOptions": {
     "outDir": "dist",
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "declaration": true
   },
-  "include": ["**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
