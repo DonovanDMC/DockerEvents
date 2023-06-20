@@ -70,14 +70,14 @@ function clean() {
     process.kill(process.pid, "SIGKILL");
 }
 
-log("log", "Launching - refreshing");
+log("log", "Launched");
 await refresh();
 
 events
     .on("container.start", async data => {
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
-                log("group", "Got start for %s - refreshing", data.Actor.Attributes.hostname);
+                log("group", "Got start for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
@@ -86,7 +86,7 @@ events
     .on("container.stop", async data => {
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
-                log("group", "Got stop for %s - refreshing", data.Actor.Attributes.hostname);
+                log("group", "Got stop for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
@@ -95,7 +95,7 @@ events
     .on("container.die", async data => {
         if (data.Actor.Attributes.hostname !== undefined) {
             Queue.add((async() => {
-                log("group", "Got die for %s - refreshing", data.Actor.Attributes.hostname);
+                log("group", "Got die for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
                 console.groupEnd();
             }));
@@ -165,7 +165,6 @@ async function refresh(from) {
         let container;
 
         let shouldLog = true;
-        // not our concern currently, defer to what we already have in the hosts file.
         if (from === undefined || d.containers.some(c => c.container === from)) {
             console.group(`[Refresh] Duplicate host ${d.host} found on ${d.containers.length} containers`);
 
@@ -190,6 +189,7 @@ async function refresh(from) {
                 log("error", "Failed to pick container to assign host.");
             }
         } else {
+            // not our concern currently, defer to what we already have in the hosts file.
             container = d.containers.find(c => content.some(l => l.includes(c.container)));
             if (container === undefined) {
                 container = d.containers[0];
