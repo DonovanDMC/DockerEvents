@@ -196,16 +196,20 @@ async function refresh(from) {
             }
             shouldLog = false;
         }
-
         for (const c of d.containers) {
             if (c === container) {
                 continue;
             }
-            if (shouldLog) {
-                log("debug", "Removing container %s (%s).", c.container, c.name);
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore it is defined
+            const index = containers.findIndex(ct => ct.container === c.container);
+            if (index !== -1) {
+                containers.splice(index, 1);
+
+                if (shouldLog) {
+                    log("debug", "Removed container %s (%s).", c.container, c.name);
+                }
             }
-            const index = containers.indexOf(container);
-            containers.splice(index, 1);
         }
         console.groupEnd();
     }
@@ -217,6 +221,7 @@ async function refresh(from) {
         maxNameLen = Math.max(maxNameLen, name.length);
         maxContainerLen = Math.max(maxContainerLen, container.length);
     }
+
     const newContent = ["# begin docker-hosts", ...containers.map(d => `${d.ip.padEnd(maxIPLen, " ")} ${d.host.padEnd(maxHostLen, " ")} # ${d.name.padEnd(maxNameLen, " ")} (${d.container.padEnd(maxContainerLen, " ")})`), "# end docker-hosts"];
     content.push(...newContent);
     await copyFile(hostsFile, `${hostsFile}.bak`);
