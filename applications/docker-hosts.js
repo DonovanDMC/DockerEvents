@@ -173,7 +173,7 @@ async function refresh(from) {
             if (hasNumbers) {
                 log("debug", "Containers seem to be numbered, using highest container.");
                 const highest = d.containers.reduce((prev, curr) => {
-                    const num = Number(curr.name.at(-1));
+                    const num = Number(curr.name.split("-").at(-1));
                     return isNaN(num) ?  prev : Math.max(prev, num);
                 }, -1);
                 container = d.containers.find(c => c.name.endsWith(`-${highest}`));
