@@ -7,4 +7,4 @@ COPY package.json pnpm-lock.yaml ./
 RUN npx pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN npx pnpm prepare
-CMD npx pnpm start
+CMD ["node", "/app/applications/docker-hosts.js"]
