@@ -8,7 +8,7 @@ import {
     writeFile
 } from "node:fs/promises";
 
-const hostsFile = process.env.HOSTS_FILE ?? "/data/hosts";
+const hostsFile = process.env.HOSTS_FILE ?? "/tmp/hosts";
 const filter = process.env.FILTER_REGEX ?? ".*";
 const r = new RegExp(filter);
 const singleRun = process.env.SINGLE_RUN === "1";
@@ -74,9 +74,11 @@ function clean() {
 }
 
 log("log", "Launched");
-await refresh();
+const total = await refresh();
+log("log", "Successfully updated %d hosts.", total);
 
 if (singleRun) {
+    log("log", "Launched in single-run mode, exiting..");
     process.exit(0);
 }
 
@@ -233,6 +235,7 @@ async function refresh(from) {
     content.push(...newContent);
     await copyFile(hostsFile, `${hostsFile}.bak`);
     await writeFile(hostsFile, content.join("\n"), { encoding: "utf8" });
+    return containers.length;
 }
 
 async function getHosts() {
