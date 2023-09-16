@@ -8,7 +8,7 @@ import {
     writeFile
 } from "node:fs/promises";
 
-const hostsFile = process.env.HOSTS_FILE ?? "/tmp/hosts";
+const hostsFile = process.env.HOSTS_FILE ?? "/data/hosts";
 const filter = process.env.FILTER_REGEX ?? ".*";
 const r = new RegExp(filter);
 const singleRun = process.env.SINGLE_RUN === "1";
