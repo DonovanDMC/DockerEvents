@@ -9,6 +9,9 @@ import {
 } from "node:fs/promises";
 
 const hostsFile = process.env.HOSTS_FILE ?? "/data/hosts";
+const filter = process.env.FILTER_REGEX ?? ".*";
+const r = new RegExp(filter);
+const singleRun = process.env.SINGLE_RUN === "1";
 
 try {
     await access(hostsFile, constants.R_OK | constants.W_OK);
@@ -73,9 +76,13 @@ function clean() {
 log("log", "Launched");
 await refresh();
 
+if (singleRun) {
+    process.exit(0);
+}
+
 events
     .on("container.start", async data => {
-        if (data.Actor.Attributes.hostname !== undefined) {
+        if (data.Actor.Attributes.hostname !== undefined && r.test(data.Actor.Attributes.name)) {
             Queue.add((async() => {
                 log("group", "Got start for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
@@ -84,7 +91,7 @@ events
         }
     })
     .on("container.stop", async data => {
-        if (data.Actor.Attributes.hostname !== undefined) {
+        if (data.Actor.Attributes.hostname !== undefined && r.test(data.Actor.Attributes.name)) {
             Queue.add((async() => {
                 log("group", "Got stop for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
@@ -93,7 +100,7 @@ events
         }
     })
     .on("container.die", async data => {
-        if (data.Actor.Attributes.hostname !== undefined) {
+        if (data.Actor.Attributes.hostname !== undefined && r.test(data.Actor.Attributes.name)) {
             Queue.add((async() => {
                 log("group", "Got die for %s", data.Actor.Attributes.hostname);
                 await refresh(data.Actor.ID);
@@ -231,5 +238,5 @@ async function refresh(from) {
 async function getHosts() {
     /** @type {import("./types").Container[]} */
     const containers = await get(events.connect, "/containers/json");
-    return containers.filter(c => c.Labels.hostname !== undefined).map(c => ({ container: c.Id, host: c.Labels.hostname, ip: c.NetworkSettings.Networks[c.HostConfig.NetworkMode === "default" ? "bridge" : c.HostConfig.NetworkMode].IPAddress, name: c.Names[0].slice(1) }));
+    return containers.filter(c => c.Labels.hostname !== undefined && r.test(c.Names[0].slice(1))).map(c => ({ container: c.Id, host: c.Labels.hostname, ip: c.NetworkSettings.Networks[c.HostConfig.NetworkMode === "default" ? "bridge" : c.HostConfig.NetworkMode].IPAddress, name: c.Names[0].slice(1) }));
 }
