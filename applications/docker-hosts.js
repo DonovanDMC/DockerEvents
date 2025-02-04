@@ -209,8 +209,6 @@ async function refresh(from) {
             if (c === container) {
                 continue;
             }
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore it is defined
             const index = containers.findIndex(ct => ct.container === c.container);
             if (index !== -1) {
                 containers.splice(index, 1);
@@ -225,12 +223,14 @@ async function refresh(from) {
 
     let maxIPLen = 0, maxHostLen = 0, maxNameLen = 0, maxContainerLen = 0;
     for (const { container, host, ip, name } of containers) {
+        // @ts-expect-error continers with null ips are filtered out
         maxIPLen = Math.max(maxIPLen, ip.length);
         maxHostLen = Math.max(maxHostLen, host.length);
         maxNameLen = Math.max(maxNameLen, name.length);
         maxContainerLen = Math.max(maxContainerLen, container.length);
     }
 
+    // @ts-expect-error continers with null ips are filtered out
     const newContent = ["# begin docker-hosts", ...containers.map(d => `${d.ip.padEnd(maxIPLen, " ")} ${d.host.padEnd(maxHostLen, " ")} # ${d.name.padEnd(maxNameLen, " ")} (${d.container.padEnd(maxContainerLen, " ")})`), "# end docker-hosts"];
     content.push(...newContent);
     await copyFile(hostsFile, `${hostsFile}.bak`);
@@ -241,5 +241,23 @@ async function refresh(from) {
 async function getHosts() {
     /** @type {import("./types").Container[]} */
     const containers = await get(events.connect, "/containers/json");
-    return containers.filter(c => c.Labels.hostname !== undefined && r.test(c.Names[0].slice(1))).map(c => ({ container: c.Id, host: c.Labels.hostname, ip: c.NetworkSettings.Networks[c.HostConfig.NetworkMode === "default" ? "bridge" : c.HostConfig.NetworkMode].IPAddress, name: c.Names[0].slice(1) }));
+    return containers.filter(c => c.Labels.hostname !== undefined && hasIp(c) && r.test(c.Names[0].slice(1))).map(c => ({ container: c.Id, host: c.Labels.hostname, ip: getIp(c), name: c.Names[0].slice(1) }));
+}
+
+/** @param {import("./types").Container} container */
+function getIp(container) {
+    if (container.HostConfig.NetworkMode === "none") {
+        return null;
+    }
+
+    try {
+        return container.NetworkSettings.Networks[container.HostConfig.NetworkMode === "default" ? "bridge" : container.HostConfig.NetworkMode].IPAddress;
+    } catch {
+        return null;
+    }
+}
+
+/** @param {import("./types").Container} container */
+function hasIp(container) {
+    return !!getIp(container);
 }

@@ -84,7 +84,7 @@ export function get<T = unknown>(info: string | URL, path: string) {
                 });
                 return;
             }
-            const data: Array<Buffer> = [];
+            const data: Array<Uint8Array> = [];
             res
                 .on("error", reject)
                 .on("data", data.push.bind(data))

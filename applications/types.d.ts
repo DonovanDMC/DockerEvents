@@ -7,7 +7,7 @@ export interface Container {
     Names: Array<string>;
     NetworkSettings: {
         Networks: Record<string, {
-            IPAddress: string;
+            IPAddress: string; // can be literal ""
         }>;
     };
 }
@@ -20,6 +20,6 @@ export interface HostDuplicate {
 export interface ContainerInfo {
     container: string;
     host: string;
-    ip: string;
+    ip: string | null;
     name: string;
 }
